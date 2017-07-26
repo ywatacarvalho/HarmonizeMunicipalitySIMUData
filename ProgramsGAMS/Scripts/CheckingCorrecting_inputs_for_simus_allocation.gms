@@ -1,0 +1,316 @@
+
+scalar percentual_allowed_forest /0.2/;
+scalar percentual_allowed_wetlands /0.2/;
+
+*-----------------------------------------------------------------------------------------------------------------------------
+*--- Esse trecho contém toda a construção de algumas variáveis básicas bem como a checagem e correção
+*--- de variáveis e inputs.
+*-----------------------------------------------------------------------------------------------------------------------------
+
+PARAMETER ibge_mun_data(codmun_ibge_all, AllVarsMun) Data for land use and cover analysis (area in thousand ha);
+PARAMETER CropPastureVegIBGE(simucont_id_all) Data for free area for pasture crops and planted forest (area in thousand ha);
+
+*------------------------------------------------------------------------------
+*---- checking the relation between protected, unprotected and total vars
+*------------------------------------------------------------------------------
+
+parameter chk_diff_area_veg_ibge(simucont_id_all, GlobiomClassesFromVegIbge);
+parameter chk_diff_total_simu(simucont_id_all, GlobiomClassesFromVegIbge);
+
+chk_diff_total_simu(simucont_id_all, GlobiomClassesFromVegIbge)$(abs(LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_total_simu_veg_ibge')
+                                                         - LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_simu_veg_ibge_all_pas')
+                                                         - LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_simu_veg_ibge_unprotected')) > 1e-4)
+                                                         = LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_total_simu_veg_ibge')
+                                                                 - LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_simu_veg_ibge_all_pas')
+                                                                 - LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_simu_veg_ibge_unprotected');
+
+display chk_diff_total_simu;
+
+*------------------------------------------------------------------------------
+*---- correcting intersection between municipalities and simus
+*------------------------------------------------------------------------------
+
+IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareSimUInMun')$(IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareSimUInMun') > 1) = 1.0;
+IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareMunInSimU')$(IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareMunInSimU') > 1) = 1.0;
+IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareSimUInMunSemAreasProt')$(IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareSimUInMunSemAreasProt') > 1) = 1.0;
+IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareMunInSimUSemAreasProt')$(IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareMunInSimUSemAreasProt') > 1) = 1.0;
+
+*-------------------------------------------------------------------------------------------
+*---- reclassifying other natural land to allow for crop and pasture inside these areas
+*-------------------------------------------------------------------------------------------
+
+parameter area_total_other_natural_land_pre(VegIbgeMapVars);
+area_total_other_natural_land_pre(VegIbgeMapVars) = sum(simucont_id_all, LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'OTHER_NATURAL_LAND', VegIbgeMapVars));
+display area_total_other_natural_land_pre;
+
+LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', VegIbgeMapVars) =
+                                    LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', VegIbgeMapVars) +
+                                    LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'OTHER_NATURAL_LAND', VegIbgeMapVars);
+
+LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'OTHER_NATURAL_LAND', VegIbgeMapVars) = 0;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- adjusting temporary crops area so as the sum of considered crops is less than equal to sum of temporary and permanent crops
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+parameter chk_areas_crops(codmun_ibge_all);
+chk_areas_crops(codmun_ibge_all)$((ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cevada') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Feijao') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Mandioca') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Milho') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Algodao') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Amendoim') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Batata') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Arroz') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Soja') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sorgo') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CanaDeAcucar') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_BatataDoce') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Trigo') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Dende') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Aveia') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cacau') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cafe') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CastanhaCaju') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sisal')) >
+                            (ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias') +
+                             ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultPermanentes'))) = yes;
+display chk_areas_crops;
+
+scalar soma_cult_temporary_pre;
+soma_cult_temporary_pre = sum(codmun_ibge_all, ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias'));
+display soma_cult_temporary_pre;
+
+ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias')$
+                           ((ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cevada') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Feijao') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Mandioca') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Milho') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Algodao') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Amendoim') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Batata') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Arroz') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Soja') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sorgo') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CanaDeAcucar') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_BatataDoce') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Trigo') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Dende') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Aveia') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cacau') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cafe') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CastanhaCaju') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sisal')) >
+                                                       (ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias') +
+                                                        ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultPermanentes'))) =
+                           ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias') +
+                           ((ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cevada') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Feijao') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Mandioca') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Milho') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Algodao') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Amendoim') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Batata') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Arroz') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Soja') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sorgo') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CanaDeAcucar') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_BatataDoce') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Trigo') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Dende') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Aveia') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cacau') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cafe') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CastanhaCaju') +
+                                                       ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sisal')) -
+                                                       (ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias') +
+                                                        ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultPermanentes')));
+
+scalar soma_cult_temporary_pos;
+soma_cult_temporary_pos = sum(codmun_ibge_all, ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias'));
+display soma_cult_temporary_pos;
+
+parameter chk_areas_crops_after_adjust(codmun_ibge_all);
+chk_areas_crops_after_adjust(codmun_ibge_all)$((ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cevada') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Feijao') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Mandioca') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Milho') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Algodao') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Amendoim') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Batata') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Arroz') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Soja') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sorgo') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CanaDeAcucar') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_BatataDoce') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Trigo') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Dende') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Aveia') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cacau') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Cafe') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CastanhaCaju') +
+                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_Sisal')) >
+                            (ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias') +
+                             ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultPermanentes'))) = yes;
+display chk_areas_crops_after_adjust;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- area free for crop, pasture and planted forest e summing areas for different globiom classes
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+*CropPastureVegIBGE(simucont_id_all) = LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_total_simu_veg_ibge') -
+*                                 LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_simu_veg_ibge_full_protection') -
+*                                 LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_simu_veg_ibge_sustainable_use') -
+*                                 LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_simu_veg_ibge_indigenous_land');
+
+CropPastureVegIBGE(simucont_id_all) = LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_total_simu_veg_ibge') -
+                                      LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'CROP_PASTURE_OR_OTHER_NATURAL_LAND', 'area_simu_veg_ibge_all_pas');
+
+parameter sum_areas_globiom_classes(GlobiomClassesFromVegIbge);
+sum_areas_globiom_classes(GlobiomClassesFromVegIbge) = sum(simucont_id_all,
+                                                           LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, 'area_total_simu_veg_ibge'));
+display sum_areas_globiom_classes;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- because of precision problems in the IBGE vegetation map for Legal Amazon, we will allow allocation of crops, pasture and
+*---- planted forest also into forest area inside this region
+*---- ATENÇÃO: posteriormente, todo o procedimento vai ter que levar isso em conta - primeiramente vamos usar areas de crop, pasto
+*---- e other natural land; depois vamos usar área de floresta e depois área de wetlands
+*---- Observação: vamos usar apenas um percentual de florestas e wetlands
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+parameter CropPastureVegIBGE_NoAddLandClasses(simucont_id_all);
+CropPastureVegIBGE_NoAddLandClasses(simucont_id_all) = CropPastureVegIBGE(simucont_id_all);
+
+CropPastureVegIBGE(simucont_id_all)$(LegalAmazonBiomeMap(simucont_id_all)) = CropPastureVegIBGE(simucont_id_all) +
+                                 percentual_allowed_forest * (LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'FOREST', 'area_total_simu_veg_ibge') -
+                                                              LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'FOREST', 'area_simu_veg_ibge_all_pas')) +
+                                 percentual_allowed_wetlands * (LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'WETLANDS', 'area_total_simu_veg_ibge') -
+                                                                LAND_COVER_IBGE_VEG_MAP(simucont_id_all, 'WETLANDS', 'area_simu_veg_ibge_all_pas'));
+
+scalar sum_CropPastureVegIBGE_NoAddLandClasses_legal_am;
+sum_CropPastureVegIBGE_NoAddLandClasses_legal_am = sum(simucont_id_all$(LegalAmazonBiomeMap(simucont_id_all)), CropPastureVegIBGE_NoAddLandClasses(simucont_id_all))
+display sum_CropPastureVegIBGE_NoAddLandClasses_legal_am;
+
+scalar sum_CropPastureVegIBGE_NoAddLandClasses_non_legal_am;
+sum_CropPastureVegIBGE_NoAddLandClasses_non_legal_am = sum(simucont_id_all$(LegalAmazonBiomeMap(simucont_id_all) <= 0), CropPastureVegIBGE_NoAddLandClasses(simucont_id_all))
+display sum_CropPastureVegIBGE_NoAddLandClasses_non_legal_am;
+
+scalar sum_CropPastureVegIBGE_AddLandClasses_legal_am;
+sum_CropPastureVegIBGE_AddLandClasses_legal_am = sum(simucont_id_all$(LegalAmazonBiomeMap(simucont_id_all)), CropPastureVegIBGE(simucont_id_all))
+display sum_CropPastureVegIBGE_AddLandClasses_legal_am;
+
+scalar sum_CropPastureVegIBGE_AddLandClasses_non_legal_am;
+sum_CropPastureVegIBGE_AddLandClasses_non_legal_am = sum(simucont_id_all$(LegalAmazonBiomeMap(simucont_id_all) <= 0), CropPastureVegIBGE(simucont_id_all))
+display sum_CropPastureVegIBGE_AddLandClasses_non_legal_am;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- correcting for possible negative simu free area
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+scalar total_simul_free_area_pre;
+total_simul_free_area_pre = sum(simucont_id_all$CropPastureVegIBGE(simucont_id_all), CropPastureVegIBGE(simucont_id_all));
+display total_simul_free_area_pre;
+
+CropPastureVegIBGE(simucont_id_all)$(CropPastureVegIBGE(simucont_id_all) < 0) = 0;
+
+scalar total_simul_free_area_pos;
+total_simul_free_area_pos = sum(simucont_id_all$CropPastureVegIBGE(simucont_id_all), CropPastureVegIBGE(simucont_id_all));
+display total_simul_free_area_pos;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- preparing classes for classification
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+PARAMETER otim_land_cover_simu_data(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced);
+PARAMETER otim_land_cover_simu_data_negative(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced);
+
+otim_land_cover_simu_data(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced)
+                 $(LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced) > 0) =
+                         LAND_COVER_IBGE_VEG_MAP(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced);
+
+scalar soma_otim_land_cover_simu_data;
+soma_otim_land_cover_simu_data = sum((simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced),
+                                 otim_land_cover_simu_data(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced));
+display soma_otim_land_cover_simu_data;
+
+otim_land_cover_simu_data_negative(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced)$
+                 (otim_land_cover_simu_data(simucont_id_all, GlobiomClassesFromVegIbge, VegIbgeMapVarsReduced) < 0) = yes;
+display otim_land_cover_simu_data_negative;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- total area to be allocated from IBGE
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+ibge_mun_data(codmun_ibge_all,'all_crops_area_ibge_2000') = (ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultPermanentes') +
+                                                            ibge_mun_data_crops(codmun_ibge_all, 'area_ha_2000_CultTemporarias')) / 1000;
+
+ibge_mun_data(codmun_ibge_all,'area_grass_2000_ibge_total') = ibge_mun_data_animals_pasture(codmun_ibge_all, 'area_ha_2000_pasture') / 1000;
+
+ibge_mun_data(codmun_ibge_all,'area_planted_forest_2006_ibge') = ibge_mun_data_planted_forests(codmun_ibge_all, 'area_ha_2006_ForestPlanted') / 1000;
+
+ibge_mun_data(codmun_ibge_all,'area_crop_pasture_2000_total') = ibge_mun_data(codmun_ibge_all,'all_crops_area_ibge_2000') +
+                                                                ibge_mun_data(codmun_ibge_all,'area_grass_2000_ibge_total') +
+                                                                ibge_mun_data(codmun_ibge_all,'area_planted_forest_2006_ibge');
+
+scalar area_total_a_ser_alocada;
+area_total_a_ser_alocada = sum(codmun_ibge_all$(ibge_mun_data(codmun_ibge_all,'area_crop_pasture_2000_total')> 0),
+                                 ibge_mun_data(codmun_ibge_all,'area_crop_pasture_2000_total'));
+display area_total_a_ser_alocada;
+
+parameter soma_areas_para_alocacao_ibge(AllVarsMun);
+soma_areas_para_alocacao_ibge(AllVarsMun) = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all, AllVarsMun));
+display soma_areas_para_alocacao_ibge;
+
+parameter soma_shares(IntersectSimuIBGE);
+soma_shares(IntersectSimuIBGE) = sum((simucont_id_all, codmun_ibge_all), IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, IntersectSimuIBGE));
+display soma_shares;
+
+parameter soma_shares_in_mun(IntersectSimuIBGE, codmun_ibge_all);
+soma_shares_in_mun('shareMunInSimUSemAreasProt', codmun_ibge_all) = sum(simucont_id_all, IntersectSimuIbgeArea(simucont_id_all, codmun_ibge_all, 'shareMunInSimUSemAreasProt'));
+*display soma_shares_in_mun;
+
+parameter soma_teste_ibge_mun_data(AllVarsMun);
+soma_teste_ibge_mun_data(AllVarsMun) = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all, AllVarsMun));
+display soma_teste_ibge_mun_data;
+
+parameter centroides_x(codmun_ibge_all);
+centroides_x(codmun_ibge_all) = CentroidesMun(codmun_ibge_all, 'X');
+
+scalar num_centroides;
+num_centroides = card(centroides_x);
+display num_centroides;
+
+scalar total_area_planted_forest_2006;
+total_area_planted_forest_2006 = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all,'area_planted_forest_2006_ibge'));
+display total_area_planted_forest_2006;
+
+scalar total_area_all_crops_2000;
+total_area_all_crops_2000 = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all,'all_crops_area_ibge_2000'));
+display total_area_all_crops_2000;
+
+scalar total_area_grass_2000;
+total_area_grass_2000 = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all,'area_grass_2000_ibge_total'));
+display total_area_grass_2000;
+
+scalar total_area_crop_pasture_2000;
+total_area_crop_pasture_2000 = sum(codmun_ibge_all, ibge_mun_data(codmun_ibge_all,'area_crop_pasture_2000_total'));
+display total_area_crop_pasture_2000;
+
+*-----------------------------------------------------------------------------------------------------------------------------------
+*---- correcting for possible negative simu free area
+*-----------------------------------------------------------------------------------------------------------------------------------
+
+scalar total_simul_free_area_pre;
+total_simul_free_area_pre = sum(simucont_id_all$CropPastureVegIBGE(simucont_id_all), CropPastureVegIBGE(simucont_id_all));
+display total_simul_free_area_pre;
+
+CropPastureVegIBGE(simucont_id_all)$(CropPastureVegIBGE(simucont_id_all) < 0) = 0;
+
+scalar total_simul_free_area_pos;
+total_simul_free_area_pos = sum(simucont_id_all$CropPastureVegIBGE(simucont_id_all), CropPastureVegIBGE(simucont_id_all));
+display total_simul_free_area_pos;
+
+*----------------------------------------------------------------------------------------------------------------*
+*---------                                            the end                                      --------------*
+*----------------------------------------------------------------------------------------------------------------*

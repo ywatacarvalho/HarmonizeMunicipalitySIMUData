@@ -31,7 +31,7 @@ $include .\Scripts\CheckingCorrecting_inputs_for_simus_allocation.gms
 
 *--- weights for close municipalities and simulation units
 
-*$include .\Scripts\preparing_distance_data.gms
+$include .\Scripts\preparing_distance_data.gms
 
 *----------------------------------------------------------------------------------------------------------------*
 *---------                                            the end                                      --------------*
